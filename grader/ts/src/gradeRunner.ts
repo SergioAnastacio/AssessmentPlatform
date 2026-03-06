@@ -132,49 +132,15 @@ export async function runWithTimeout(opts: RunnerOptions): Promise<RunnerOutcome
     };
   }
 
-  // Non-zero exit is a hard failure (even if it printed JSON).
-  if (exit_code !== 0) {
-    return {
-      timed_out: false,
-      exit_code,
-      stdout_truncated,
-      stderr_truncated,
-      stdout,
-      stderr,
-      error_code: "NONZERO_EXIT",
-      error: { name: "NonZeroExit", message: `Harness exited with code ${String(exit_code)}` },
-    };
-  }
-
   // Harness prints raw JSON (no formatting). Try parsing whole stdout.
   // If child logged something accidentally, parsing may fail; we return stderr/stdout for debugging.
+  type HarnessEnvelope =
+    | { ok: true; grade: GradeResult }
+    | { ok: false; phase: string; error: { name: string; message: string } };
+
+  let env: HarnessEnvelope | null = null;
   try {
-    const grade = JSON.parse(stdout) as GradeResult;
-
-    // Domain failure: tests failed
-    if (!grade.passed) {
-      return {
-        timed_out: false,
-        exit_code,
-        stdout_truncated,
-        stderr_truncated,
-        stdout,
-        stderr,
-        grade,
-        error_code: "FAILED_TESTS",
-        error: { name: "FailedTests", message: "One or more test cases failed" },
-      };
-    }
-
-    return {
-      timed_out: false,
-      exit_code,
-      stdout_truncated,
-      stderr_truncated,
-      stdout,
-      stderr,
-      grade,
-    };
+    env = JSON.parse(stdout) as HarnessEnvelope;
   } catch (e) {
     const err = e as Error;
     return {
@@ -188,4 +154,61 @@ export async function runWithTimeout(opts: RunnerOptions): Promise<RunnerOutcome
       error: { name: err.name ?? "ParseError", message: err.message ?? "Failed to parse JSON" },
     };
   }
+
+  // If harness itself reported an error, classify as runtime error.
+  if (env && "ok" in env && env.ok === false) {
+    return {
+      timed_out: false,
+      exit_code,
+      stdout_truncated,
+      stderr_truncated,
+      stdout,
+      stderr,
+      error_code: "RUNTIME_ERROR",
+      error: { name: env.error.name, message: `${env.phase}: ${env.error.message}` },
+    };
+  }
+
+  // At this point we have a grade object.
+  const grade = (env as { ok: true; grade: GradeResult }).grade;
+
+  // Non-zero exit is still useful signal but grade is authoritative.
+  if (exit_code !== 0) {
+    return {
+      timed_out: false,
+      exit_code,
+      stdout_truncated,
+      stderr_truncated,
+      stdout,
+      stderr,
+      grade,
+      error_code: "NONZERO_EXIT",
+      error: { name: "NonZeroExit", message: `Harness exited with code ${String(exit_code)}` },
+    };
+  }
+
+  // Domain failure: tests failed
+  if (!grade.passed) {
+    return {
+      timed_out: false,
+      exit_code,
+      stdout_truncated,
+      stderr_truncated,
+      stdout,
+      stderr,
+      grade,
+      error_code: "FAILED_TESTS",
+      error: { name: "FailedTests", message: "One or more test cases failed" },
+    };
+  }
+
+  return {
+    timed_out: false,
+    exit_code,
+    stdout_truncated,
+    stderr_truncated,
+    stdout,
+    stderr,
+    grade,
+  };
 }
