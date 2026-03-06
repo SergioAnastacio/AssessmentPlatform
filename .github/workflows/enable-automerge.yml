@@ -1,0 +1,35 @@
+name: Enable auto-merge
+
+on:
+  pull_request:
+    types: [opened, reopened, labeled, synchronize]
+
+permissions:
+  pull-requests: write
+  contents: write
+
+jobs:
+  enable:
+    runs-on: ubuntu-latest
+    if: contains(github.event.pull_request.labels.*.name, 'automerge')
+    steps:
+      - name: Enable auto-merge (squash)
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pull_number = context.payload.pull_request.number;
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number,
+            });
+
+            // GraphQL mutation is required to enable auto-merge.
+            const mutation = `mutation($pullRequestId: ID!) {
+              enablePullRequestAutoMerge(input: {pullRequestId: $pullRequestId, mergeMethod: SQUASH}) {
+                pullRequest { number autoMergeRequest { enabledAt } }
+              }
+            }`;
+
+            await github.graphql(mutation, { pullRequestId: pr.node_id });
+            core.info(`Auto-merge enabled for PR #${pull_number} (squash).`);
