@@ -3,6 +3,7 @@ import path from "node:path";
 import type { GradeResult } from "./grader";
 import type { ErrorCode } from "./gradeRunner";
 import { scanSubmissionPolicy, type PolicyFlags } from "./policyScan";
+import { policyGate, type PolicyDecision } from "./policyGate";
 
 export type RunResult = {
   version: "v1";
@@ -18,6 +19,9 @@ export type RunResult = {
   policy_flags?: PolicyFlags;
   policy_findings?: string[];
   risk_score?: number;
+  // Deterministic gate decision based on policy scan
+  policy_decision?: PolicyDecision;
+  policy_reasons?: string[];
   logs: {
     stdout: string;
     stderr: string;
@@ -81,16 +85,27 @@ export async function main(argv: string[]) {
     out.policy_flags = scan.flags;
     out.policy_findings = scan.findings;
     out.risk_score = scan.risk_score;
+
+    const gate = policyGate({ flags: scan.flags, risk_score: scan.risk_score });
+    out.policy_decision = gate.decision;
+    out.policy_reasons = gate.reasons;
   } catch (e) {
     // Don't fail grading if policy scan fails.
-    out.policy_findings = [
-      `Policy scan failed: ${String(e)}`,
-    ];
+    out.policy_findings = [`Policy scan failed: ${String(e)}`];
+    const gate = policyGate({ flags: undefined, risk_score: 0 });
+    out.policy_decision = gate.decision;
+    out.policy_reasons = gate.reasons;
   }
 
   process.stdout.write(JSON.stringify(out, null, 2) + "\n");
 
+  // Exit codes
+  // 124: timeout
+  // 3: blocked by policy gate
+  // 2: failed tests
+  // 0: ok
   if (outcome.timed_out) process.exitCode = 124;
+  else if (out.policy_decision === "blocked") process.exitCode = 3;
   else if (outcome.grade?.passed) process.exitCode = 0;
   else process.exitCode = 2;
 }
