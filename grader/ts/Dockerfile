@@ -14,7 +14,7 @@ COPY submissions ../../submissions
 
 RUN npm run check
 
-# Smoke grade the sample submission
-RUN npm run grade -- --problem sum-two --submission submissions/ts/sum-two/submission.ts
+# Smoke grade the sample submission (includes timeout/log plumbing)
+RUN npm run grade -- --problem sum-two --submission submissions/ts/sum-two/submission.ts --timeout-ms 2000
 
 CMD ["npm","test"]

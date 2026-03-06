@@ -8,6 +8,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "grade": "tsx src/runSubmission.ts",
+    "harness": "tsx src/harness.ts",
     "check": "npm run lint && npm run test"
   },
   "devDependencies": {

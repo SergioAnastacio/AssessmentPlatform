@@ -1,8 +1,25 @@
-import path from "node:path";
-import { evaluateSubmission, problemPathFromRepoRoot } from "./evaluate";
+import { runWithTimeout } from "./gradeRunner";
+import type { GradeResult } from "./grader";
+
+export type RunResult = {
+  version: "v1";
+  problem_id: string;
+  language: "typescript";
+  timed_out: boolean;
+  exit_code: number | null;
+  duration_ms?: number;
+  grade_result?: GradeResult;
+  runner_error?: { name: string; message: string };
+  logs: {
+    stdout: string;
+    stderr: string;
+    stdout_truncated: boolean;
+    stderr_truncated: boolean;
+  };
+};
 
 // Usage (from repo root via Docker/CI):
-//   npm --prefix grader/ts run grade -- --problem sum-two --submission submissions/ts/sum-two/submission.ts
+//   npm --prefix grader/ts run grade -- --problem sum-two --submission submissions/ts/sum-two/submission.ts --timeout-ms 2000
 
 export async function main(argv: string[]) {
   const args = new Map<string, string>();
@@ -15,21 +32,42 @@ export async function main(argv: string[]) {
     }
   }
 
-  const repoRoot = path.resolve(process.cwd(), "..", "..");
   const problemId = args.get("problem") ?? "sum-two";
   const submissionRel = args.get("submission") ?? "submissions/ts/sum-two/submission.ts";
+  const exportName = args.get("export") ?? "sumTwo";
+  const timeoutMs = Number(args.get("timeout-ms") ?? "2000");
+  const maxOutputBytes = Number(args.get("max-output-bytes") ?? String(32 * 1024));
 
-  const problemJsonPath = problemPathFromRepoRoot(repoRoot, problemId);
-  const submissionPath = path.join(repoRoot, submissionRel);
-
-  const res = await evaluateSubmission({
-    problemJsonPath,
-    submissionPath,
-    exportName: "sumTwo",
+  const outcome = await runWithTimeout({
+    problemId,
+    submissionRelPath: submissionRel,
+    exportName,
+    timeoutMs,
+    maxOutputBytes,
   });
 
-  process.stdout.write(JSON.stringify(res, null, 2) + "\n");
-  process.exitCode = res.passed ? 0 : 2;
+  const out: RunResult = {
+    version: "v1",
+    problem_id: problemId,
+    language: "typescript",
+    timed_out: outcome.timed_out,
+    exit_code: outcome.exit_code,
+    duration_ms: outcome.grade?.duration_ms,
+    grade_result: outcome.grade,
+    runner_error: outcome.error,
+    logs: {
+      stdout: outcome.stdout,
+      stderr: outcome.stderr,
+      stdout_truncated: outcome.stdout_truncated,
+      stderr_truncated: outcome.stderr_truncated,
+    },
+  };
+
+  process.stdout.write(JSON.stringify(out, null, 2) + "\n");
+
+  if (outcome.timed_out) process.exitCode = 124;
+  else if (outcome.grade?.passed) process.exitCode = 0;
+  else process.exitCode = 2;
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

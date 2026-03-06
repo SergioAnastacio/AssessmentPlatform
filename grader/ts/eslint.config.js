@@ -12,7 +12,10 @@ export default [
       parser: tsParser,
       globals: {
         process: "readonly",
-        console: "readonly"
+        console: "readonly",
+        Buffer: "readonly",
+        setTimeout: "readonly",
+        clearTimeout: "readonly"
       }
     },
     plugins: {
@@ -21,7 +24,8 @@ export default [
     rules: {
       "no-unused-vars": "off",
       "@typescript-eslint/no-floating-promises": "off",
-      "@typescript-eslint/no-explicit-any": "off"
+      "@typescript-eslint/no-explicit-any": "off",
+      "no-constant-condition": "off"
     }
   }
 ];
