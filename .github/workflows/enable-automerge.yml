@@ -3,6 +3,9 @@ name: Enable auto-merge
 on:
   pull_request:
     types: [opened, reopened, labeled, synchronize]
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
 
 permissions:
   pull-requests: write
@@ -11,18 +14,46 @@ permissions:
 jobs:
   enable:
     runs-on: ubuntu-latest
-    if: contains(github.event.pull_request.labels.*.name, 'automerge')
     steps:
-      - name: Enable auto-merge (squash)
+      - name: Resolve PR number
+        id: pr
         uses: actions/github-script@v7
         with:
           script: |
-            const pull_number = context.payload.pull_request.number;
+            // Support both pull_request and workflow_run triggers.
+            if (context.eventName === 'pull_request') {
+              core.setOutput('number', String(context.payload.pull_request.number));
+              return;
+            }
+
+            // workflow_run payload includes pull_requests array when triggered from PR.
+            const prs = context.payload.workflow_run.pull_requests || [];
+            if (!prs.length) {
+              core.notice('No PR associated with this CI run. Skipping.');
+              core.setOutput('number', '');
+              return;
+            }
+
+            core.setOutput('number', String(prs[0].number));
+
+      - name: Enable auto-merge (squash)
+        if: steps.pr.outputs.number != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pull_number = Number(core.getInput('pull_number') || '${{ steps.pr.outputs.number }}');
+
             const { data: pr } = await github.rest.pulls.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
               pull_number,
             });
+
+            const labels = (pr.labels || []).map(l => l.name);
+            if (!labels.includes('automerge')) {
+              core.info(`PR #${pull_number} does not have 'automerge' label. Skipping.`);
+              return;
+            }
 
             // GraphQL mutation is required to enable auto-merge.
             const mutation = `mutation($pullRequestId: ID!) {
@@ -31,5 +62,20 @@ jobs:
               }
             }`;
 
-            await github.graphql(mutation, { pullRequestId: pr.node_id });
-            core.info(`Auto-merge enabled for PR #${pull_number} (squash).`);
+            // Retry a few times: GitHub may report PR as "unstable" immediately after label/sync.
+            const maxAttempts = 6;
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+              try {
+                await github.graphql(mutation, { pullRequestId: pr.node_id });
+                core.info(`Auto-merge enabled for PR #${pull_number} (squash).`);
+                return;
+              } catch (e) {
+                const msg = String(e?.message || e);
+                if (msg.includes('unstable status') && attempt < maxAttempts) {
+                  core.warning(`PR #${pull_number} unstable; retrying (${attempt}/${maxAttempts})...`);
+                  await new Promise(r => setTimeout(r, 5000));
+                  continue;
+                }
+                throw e;
+              }
+            }
