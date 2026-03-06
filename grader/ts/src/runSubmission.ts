@@ -1,5 +1,6 @@
 import { runWithTimeout } from "./gradeRunner";
 import type { GradeResult } from "./grader";
+import type { ErrorCode } from "./gradeRunner";
 
 export type RunResult = {
   version: "v1";
@@ -9,6 +10,7 @@ export type RunResult = {
   exit_code: number | null;
   duration_ms?: number;
   grade_result?: GradeResult;
+  error_code?: ErrorCode;
   runner_error?: { name: string; message: string };
   logs: {
     stdout: string;
@@ -54,6 +56,7 @@ export async function main(argv: string[]) {
     exit_code: outcome.exit_code,
     duration_ms: outcome.grade?.duration_ms,
     grade_result: outcome.grade,
+    error_code: outcome.error_code,
     runner_error: outcome.error,
     logs: {
       stdout: outcome.stdout,
