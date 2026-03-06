@@ -1,6 +1,8 @@
 import { runWithTimeout } from "./gradeRunner";
+import path from "node:path";
 import type { GradeResult } from "./grader";
 import type { ErrorCode } from "./gradeRunner";
+import { scanSubmissionPolicy, type PolicyFlags } from "./policyScan";
 
 export type RunResult = {
   version: "v1";
@@ -12,6 +14,10 @@ export type RunResult = {
   grade_result?: GradeResult;
   error_code?: ErrorCode;
   runner_error?: { name: string; message: string };
+  // Static policy scan (best-effort)
+  policy_flags?: PolicyFlags;
+  policy_findings?: string[];
+  risk_score?: number;
   logs: {
     stdout: string;
     stderr: string;
@@ -48,6 +54,9 @@ export async function main(argv: string[]) {
     maxOutputBytes,
   });
 
+  const repoRoot = path.resolve(process.cwd(), "..", "..");
+  const submissionAbs = path.join(repoRoot, submissionRel);
+
   const out: RunResult = {
     version: "v1",
     problem_id: problemId,
@@ -65,6 +74,19 @@ export async function main(argv: string[]) {
       stderr_truncated: outcome.stderr_truncated,
     },
   };
+
+  // Best-effort policy scan of the submission source.
+  try {
+    const scan = await scanSubmissionPolicy(submissionAbs);
+    out.policy_flags = scan.flags;
+    out.policy_findings = scan.findings;
+    out.risk_score = scan.risk_score;
+  } catch (e) {
+    // Don't fail grading if policy scan fails.
+    out.policy_findings = [
+      `Policy scan failed: ${String(e)}`,
+    ];
+  }
 
   process.stdout.write(JSON.stringify(out, null, 2) + "\n");
 
