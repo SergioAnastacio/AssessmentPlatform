@@ -11,6 +11,14 @@ export type RunnerOptions = {
   maxOutputBytes: number;
 };
 
+export type ErrorCode =
+  | "TIMEOUT"
+  | "RUNTIME_ERROR"
+  | "BAD_JSON"
+  | "NONZERO_EXIT"
+  | "FAILED_TESTS"
+  | "UNKNOWN";
+
 export type RunnerOutcome = {
   grade?: GradeResult;
   timed_out: boolean;
@@ -19,6 +27,7 @@ export type RunnerOutcome = {
   stderr_truncated: boolean;
   stdout: string;
   stderr: string;
+  error_code?: ErrorCode;
   error?: { name: string; message: string };
 };
 
@@ -104,6 +113,7 @@ export async function runWithTimeout(opts: RunnerOptions): Promise<RunnerOutcome
       stderr_truncated,
       stdout,
       stderr,
+      error_code: "TIMEOUT",
       error: { name: "TimeoutError", message: `Timed out after ${opts.timeoutMs}ms` },
     };
   }
@@ -117,7 +127,22 @@ export async function runWithTimeout(opts: RunnerOptions): Promise<RunnerOutcome
       stderr_truncated,
       stdout,
       stderr,
+      error_code: "RUNTIME_ERROR",
       error: { name: raced.error.name, message: raced.error.message },
+    };
+  }
+
+  // Non-zero exit is a hard failure (even if it printed JSON).
+  if (exit_code !== 0) {
+    return {
+      timed_out: false,
+      exit_code,
+      stdout_truncated,
+      stderr_truncated,
+      stdout,
+      stderr,
+      error_code: "NONZERO_EXIT",
+      error: { name: "NonZeroExit", message: `Harness exited with code ${String(exit_code)}` },
     };
   }
 
@@ -125,7 +150,31 @@ export async function runWithTimeout(opts: RunnerOptions): Promise<RunnerOutcome
   // If child logged something accidentally, parsing may fail; we return stderr/stdout for debugging.
   try {
     const grade = JSON.parse(stdout) as GradeResult;
-    return { timed_out: false, exit_code, stdout_truncated, stderr_truncated, stdout, stderr, grade };
+
+    // Domain failure: tests failed
+    if (!grade.passed) {
+      return {
+        timed_out: false,
+        exit_code,
+        stdout_truncated,
+        stderr_truncated,
+        stdout,
+        stderr,
+        grade,
+        error_code: "FAILED_TESTS",
+        error: { name: "FailedTests", message: "One or more test cases failed" },
+      };
+    }
+
+    return {
+      timed_out: false,
+      exit_code,
+      stdout_truncated,
+      stderr_truncated,
+      stdout,
+      stderr,
+      grade,
+    };
   } catch (e) {
     const err = e as Error;
     return {
@@ -135,6 +184,7 @@ export async function runWithTimeout(opts: RunnerOptions): Promise<RunnerOutcome
       stderr_truncated,
       stdout,
       stderr,
+      error_code: "BAD_JSON",
       error: { name: err.name ?? "ParseError", message: err.message ?? "Failed to parse JSON" },
     };
   }
