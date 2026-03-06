@@ -17,4 +17,4 @@ jobs:
 
       - name: Validate problems (schema)
         run: |
-          docker run --rm assessmentplatform-grader-ts:ci node /app/scripts/validate_problems.mjs
+          docker run --rm -w /app assessmentplatform-grader-ts:ci node scripts/validate_problems.mjs
