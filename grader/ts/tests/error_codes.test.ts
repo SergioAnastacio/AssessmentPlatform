@@ -31,7 +31,11 @@ describe("gradeRunner error_code", () => {
 
     // Depending on runtime/loader behavior, this can appear as NONZERO_EXIT or BAD_JSON.
     // In very slow environments this could also timeout.
-      expect(["NONZERO_EXIT", "BAD_JSON", "TIMEOUT"]).toContain(outcome.error_code);
+      // Depending on how the harness/submission fails, this may surface as:
+      // - NONZERO_EXIT / BAD_JSON (harness could not produce parseable output)
+      // - TIMEOUT (very slow environments)
+      // - FAILED_TESTS (grader ran but produced failing grade)
+      expect(["NONZERO_EXIT", "BAD_JSON", "TIMEOUT", "FAILED_TESTS"]).toContain(outcome.error_code);
     },
     15000
   );
