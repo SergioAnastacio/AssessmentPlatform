@@ -1,5 +1,10 @@
 FROM node:20-alpine
 
+# Install root-level deps needed by repo scripts (e.g. schema validation)
+WORKDIR /app
+COPY package.json package-lock.json* ./
+RUN npm ci || npm install
+
 WORKDIR /app/grader/ts
 
 # Copy only grader first for better caching
@@ -11,6 +16,9 @@ COPY grader/ts ./
 COPY problems ../../problems
 # submissions are needed for smoke grading
 COPY submissions ../../submissions
+# schemas/scripts for problem validation
+COPY schemas ../../schemas
+COPY scripts ../../scripts
 
 RUN npm run check
 

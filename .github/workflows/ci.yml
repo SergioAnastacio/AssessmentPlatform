@@ -15,6 +15,6 @@ jobs:
         run: |
           docker build -f grader/ts/Dockerfile -t assessmentplatform-grader-ts:ci .
 
-      - name: Smoke run grader
+      - name: Validate problems (schema)
         run: |
-          docker run --rm assessmentplatform-grader-ts:ci npm test
+          docker run --rm -w /app assessmentplatform-grader-ts:ci node scripts/validate_problems.mjs

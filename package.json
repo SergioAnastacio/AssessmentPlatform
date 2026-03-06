@@ -1,0 +1,13 @@
+{
+  "name": "assessmentplatform",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "devDependencies": {
+    "ajv": "^8.12.0",
+    "ajv-formats": "^3.0.1"
+  },
+  "scripts": {
+    "validate:problems": "node scripts/validate_problems.mjs"
+  }
+}
