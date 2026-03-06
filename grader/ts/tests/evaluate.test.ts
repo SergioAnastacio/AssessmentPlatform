@@ -14,8 +14,12 @@ describe("evaluateSubmission", () => {
       exportName: "sumTwo",
     });
 
+    expect(res.version).toBe("v1");
+    expect(res.problem_id).toBe("sum-two");
+    expect(res.language).toBe("typescript");
     expect(res.passed).toBe(true);
     expect(res.failed).toBe(0);
+    expect(res.duration_ms).toBeTypeOf("number");
   });
 
   it("fails for incorrect submission", async () => {
@@ -29,8 +33,12 @@ describe("evaluateSubmission", () => {
       exportName: "sumTwo",
     });
 
+    expect(res.version).toBe("v1");
+    expect(res.problem_id).toBe("sum-two");
+    expect(res.language).toBe("typescript");
     expect(res.passed).toBe(false);
     expect(res.failed).toBeGreaterThan(0);
     expect(res.failures.length).toBe(res.failed);
+    expect(res.duration_ms).toBeTypeOf("number");
   });
 });

@@ -28,6 +28,8 @@ export async function loadSubmissionFunction(
 }
 
 export async function evaluateSubmission(opts: EvaluateOptions): Promise<GradeResult> {
+  const started = Date.now();
+
   const problem: Problem = await loadProblem(opts.problemJsonPath);
   const fn = await loadSubmissionFunction(opts.submissionPath, opts.exportName);
 
@@ -44,11 +46,17 @@ export async function evaluateSubmission(opts: EvaluateOptions): Promise<GradeRe
     }
   }
 
+  const duration_ms = Date.now() - started;
+
   return {
+    version: "v1",
+    problem_id: problem.id,
+    language: "typescript",
     passed: failures.length === 0,
     total: problem.tests.length,
     failed: failures.length,
     failures,
+    duration_ms,
   };
 }
 
