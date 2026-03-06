@@ -7,11 +7,24 @@ export type Problem = {
   tests: Array<{ input: unknown[]; output: unknown }>;
 };
 
+export type GradeFailure = {
+  index: number;
+  input: unknown[];
+  expected: unknown;
+  actual: unknown;
+};
+
 export type GradeResult = {
+  /** Schema version for the grading output */
+  version: "v1";
+  problem_id: string;
+  language: "typescript";
   passed: boolean;
   total: number;
   failed: number;
-  failures: Array<{ index: number; input: unknown[]; expected: unknown; actual: unknown }>;
+  failures: GradeFailure[];
+  /** Optional execution timing */
+  duration_ms?: number;
 };
 
 // Phase 0: minimal contract — load problem.json and return it.
@@ -24,7 +37,15 @@ export async function loadProblem(problemJsonPath: string): Promise<Problem> {
 // Phase 0: stub evaluation (we'll execute user code in Phase 1)
 export async function gradeStub(problemJsonPath: string): Promise<GradeResult> {
   const p = await loadProblem(problemJsonPath);
-  return { passed: true, total: p.tests.length, failed: 0, failures: [] };
+  return {
+    version: "v1",
+    problem_id: p.id,
+    language: "typescript",
+    passed: true,
+    total: p.tests.length,
+    failed: 0,
+    failures: [],
+  };
 }
 
 export async function main(argv: string[]) {
