@@ -1,0 +1,23 @@
+{
+  "id": "sum-two",
+  "title": "Sum Two Numbers",
+  "difficulty": "easy",
+  "statement": "Given two integers a and b, return their sum.",
+  "function": {
+    "name": "sumTwo",
+    "params": [
+      { "name": "a", "type": "number" },
+      { "name": "b", "type": "number" }
+    ],
+    "returns": { "type": "number" }
+  },
+  "examples": [
+    { "input": [1, 2], "output": 3 },
+    { "input": [-5, 5], "output": 0 }
+  ],
+  "tests": [
+    { "input": [0, 0], "output": 0 },
+    { "input": [10, 20], "output": 30 },
+    { "input": [-10, -20], "output": -30 }
+  ]
+}
