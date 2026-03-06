@@ -68,7 +68,7 @@ export async function evaluateSubmission(opts: EvaluateOptions): Promise<GradeRe
 
   // Default per-test timeout must be large enough to account for worker startup overhead.
   // CI runners can be slower than local machines.
-  const per_test_timeout_ms = opts.per_test_timeout_ms ?? 750;
+  const per_test_timeout_ms = opts.per_test_timeout_ms ?? 2000;
   const max_failures = opts.max_failures ?? 10;
 
   const problem: Problem = await loadProblem(opts.problemJsonPath);
