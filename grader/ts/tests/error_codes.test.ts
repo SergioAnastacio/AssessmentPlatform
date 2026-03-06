@@ -17,11 +17,25 @@ describe("gradeRunner error_code", () => {
     expect(outcome.error_code).toBe("TIMEOUT");
   });
 
-  it("returns BAD_JSON when harness output is not valid JSON", async () => {
+  it("classifies abnormal termination (non-zero or non-JSON)", async () => {
     const outcome = await runWithTimeout({
       problemId: "sum-two",
-      submissionRelPath: "submissions/ts/sum-two/submission.ts",
-      exportName: "doesNotExist",
+      submissionRelPath: "grader/ts/tests/fixtures/exit_nonzero.ts",
+      exportName: "sumTwo",
+      timeoutMs: 2000,
+      maxOutputBytes: 8 * 1024,
+    });
+
+    expect(outcome.timed_out).toBe(false);
+    // Depending on runtime/loader behavior, this can appear as NONZERO_EXIT or BAD_JSON.
+    expect(["NONZERO_EXIT", "BAD_JSON"]).toContain(outcome.error_code);
+  });
+
+  it("returns BAD_JSON when stdout is polluted by submission logs", async () => {
+    const outcome = await runWithTimeout({
+      problemId: "sum-two",
+      submissionRelPath: "grader/ts/tests/fixtures/noisy_stdout.ts",
+      exportName: "sumTwo",
       timeoutMs: 2000,
       maxOutputBytes: 8 * 1024,
     });
